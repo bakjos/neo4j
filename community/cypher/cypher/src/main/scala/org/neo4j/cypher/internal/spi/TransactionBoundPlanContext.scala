@@ -145,33 +145,33 @@ class TransactionBoundPlanContext(tc: TransactionalContextWrapper, logger: Inter
   private def getOnlineIndex(reference: schema.IndexDescriptor): Option[IndexDescriptor] =
     tc.schemaRead.indexGetState(reference) match {
       case InternalIndexState.ONLINE =>
-        val label = LabelId(reference.schema().getEntityTokenIds()(0))
-        val properties = reference.schema.getPropertyIds.map(PropertyKeyId)
-        val isUnique = reference.isUnique
-        val behaviours = reference.getCapability.behaviours().map(kernelToCypher).toSet
-        val orderCapability: OrderCapability = tps => {
-          reference.getCapability.orderCapability(tps.map(typeToValueCategory): _*) match {
-            case Array() => IndexOrderCapability.NONE
-            case Array(IndexOrder.ASCENDING, IndexOrder.DESCENDING) => IndexOrderCapability.BOTH
-            case Array(IndexOrder.DESCENDING, schema.IndexOrder.ASCENDING) => IndexOrderCapability.BOTH
-            case Array(schema.IndexOrder.ASCENDING) => IndexOrderCapability.ASC
-            case Array(schema.IndexOrder.DESCENDING) => IndexOrderCapability.DESC
-            case _ => IndexOrderCapability.NONE
-          }
-        }
-        val valueCapability: ValueCapability = tps => {
-          reference.getCapability.valueCapability(tps.map(typeToValueCategory): _*) match {
-            // As soon as the kernel provides an array of IndexValueCapability, this mapping can change
-            case IndexValueCapability.YES => tps.map(_ => CanGetValue)
-            case IndexValueCapability.PARTIAL => tps.map(_ => DoNotGetValue)
-            case IndexValueCapability.NO => tps.map(_ => DoNotGetValue)
-          }
-        }
         if (reference.getIndexType != IndexType.BTREE || reference.getCapability.behaviours().contains(IndexBehaviour.EVENTUALLY_CONSISTENT)) {
           // Ignore IndexKind.SPECIAL indexes, because we don't know how to correctly plan for and query them. Not yet, anyway.
           // Also, ignore eventually consistent indexes. Those are for explicit querying via procedures.
           None
         } else {
+          val label = LabelId(reference.schema().getEntityTokenIds()(0))
+          val properties = reference.schema.getPropertyIds.map(PropertyKeyId)
+          val isUnique = reference.isUnique
+          val behaviours = reference.getCapability.behaviours().map(kernelToCypher).toSet
+          val orderCapability: OrderCapability = tps => {
+            reference.getCapability.orderCapability(tps.map(typeToValueCategory): _*) match {
+              case Array() => IndexOrderCapability.NONE
+              case Array(IndexOrder.ASCENDING, IndexOrder.DESCENDING) => IndexOrderCapability.BOTH
+              case Array(IndexOrder.DESCENDING, schema.IndexOrder.ASCENDING) => IndexOrderCapability.BOTH
+              case Array(schema.IndexOrder.ASCENDING) => IndexOrderCapability.ASC
+              case Array(schema.IndexOrder.DESCENDING) => IndexOrderCapability.DESC
+              case _ => IndexOrderCapability.NONE
+            }
+          }
+          val valueCapability: ValueCapability = tps => {
+            reference.getCapability.valueCapability(tps.map(typeToValueCategory): _*) match {
+              // As soon as the kernel provides an array of IndexValueCapability, this mapping can change
+              case IndexValueCapability.YES => tps.map(_ => CanGetValue)
+              case IndexValueCapability.PARTIAL => tps.map(_ => DoNotGetValue)
+              case IndexValueCapability.NO => tps.map(_ => DoNotGetValue)
+            }
+          }
           Some(IndexDescriptor(label, properties, behaviours, orderCapability, valueCapability, isUnique))
         }
       case _ => None
